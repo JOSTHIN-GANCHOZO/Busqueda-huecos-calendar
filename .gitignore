@@ -1,0 +1,27 @@
+# --- CREDENCIALES Y SECRETOS (¡CRÍTICO!) ---
+backend/.env
+backend/*credentials*.json
+backend/*.json
+# Excepciones para no borrar los JSON esenciales de Node en el frontend
+!frontend/package.json
+!frontend/package-lock.json
+
+# --- COMPILACIÓN DE PYTHON (Backend) ---
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.pyd
+backend/.venv/
+backend/env/
+backend/venv/
+
+# --- DEPENDENCIAS Y ENTORNO DE REACT (Frontend) ---
+frontend/node_modules/
+frontend/dist/
+frontend/.local
+
+# --- CONFIGURACIONES DEL EDITOR ---
+.vscode/
+.idea/
+*.suo
+*.ntvs*
