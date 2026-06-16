@@ -1,28 +1,28 @@
 import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
 import './App.css'
 
 function App() {
-  const [count, setCount] = useState(0)
+  // Estados listos para usar en el formulario
+  const [correo1, setCorreo1] = useState('')
+  const [correo2, setCorreo2] = useState('')
+  const [correo3, setCorreo3] = useState('')
+  const [duracion, setDuracion] = useState(60)
+
+  const handleBuscar = (e) => {
+    e.preventDefault()
+    // Aquí tu compañera meterá el Axios más adelante
+    console.log("Datos listos para enviar:", { correo1, correo2, correo3, duracion })
+  }
 
   return (
-    <>
-      <section id="center">
-        <div>
-          <h1>App de Busquede de huecos en calendarios</h1>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Comenta Tuarez
-        </button>
-      </section>
-      <div className="ticks"></div>
-    </>
+    <div className="container">
+      <h1>Agendamiento Inteligente de Reuniones 🚀</h1>
+      {/* Tu compañera expandirá el formulario aquí dentro */}
+      <form onSubmit={handleBuscar}>
+        <button type="submit">Buscar Horario</button>
+      </form>
+    </div>
   )
 }
+
 export default App
