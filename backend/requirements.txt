@@ -6,3 +6,4 @@ google-auth-httplib2
 google-auth-oauthlib
 pydantic
 email-validator
+sqlalchemy==2.0.51

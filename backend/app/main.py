@@ -1,8 +1,12 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api import endpoints  # Asegúrate de importar tus rutas
+from app.api import endpoints  # Tus rutas actuales
+from app.database.database import init_db  # ← NUEVA LINEA: Importamos el inicializador de la DB
 
 app = FastAPI(title="Asistente de Calendario IA")
+
+# NUEVA LINEA: Crea el archivo 'usuarios.db' y la tabla apenas prende el backend
+init_db()
 
 # CONFIGURACIÓN DE CORS: Permite que React se conecte
 origins = [
@@ -23,4 +27,4 @@ app.include_router(endpoints.router)
 
 @app.get("/")
 def read_root():
-    return {"message": "Backend de IA corriendo exitosamente 🚀"}
+    return {"message": "Backend de IA corriendo exitosamente 🚀 y Base de Datos vinculada 💾"}

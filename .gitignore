@@ -25,3 +25,9 @@ frontend/.local
 .idea/
 *.suo
 *.ntvs*
+
+
+# Base de datos local de desarrollo
+backend/usuarios.db
+*.db
+*.sqlite3

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import './App.css'
+import './estilos/index.css'
 
 function App() {
   // Estados listos para usar en el formulario
