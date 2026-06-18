@@ -1,0 +1,76 @@
+.login-container {
+min-height: 100vh;
+display: flex;
+justify-content: center;
+align-items: center;
+background: #f8fafc;
+padding: 2rem;
+}
+
+.login-card {
+width: 100%;
+max-width: 500px;
+background: #ffffff;
+border-radius: 1rem;
+overflow: hidden;
+box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
+}
+
+.login-content {
+padding: 3rem 2rem;
+text-align: center;
+}
+
+.login-title {
+font-size: 1.875rem;
+font-weight: 700;
+color: #0f172a;
+margin-bottom: 0.5rem;
+}
+
+.login-description {
+color: #475569;
+margin-bottom: 2.5rem;
+line-height: 1.6;
+}
+
+.login-button-container {
+display: flex;
+justify-content: center;
+}
+
+.login-footer {
+background: #f8fafc;
+border-top: 1px solid #e2e8f0;
+padding: 1.5rem;
+}
+
+.security-title {
+text-align: center;
+font-size: 0.625rem;
+text-transform: uppercase;
+letter-spacing: 0.15em;
+color: #94a3b8;
+font-weight: 600;
+margin-bottom: 1rem;
+}
+
+.security-features {
+display: flex;
+justify-content: center;
+gap: 2rem;
+}
+
+.security-item {
+display: flex;
+flex-direction: column;
+align-items: center;
+gap: 0.25rem;
+color: #64748b;
+font-size: 0.625rem;
+text-transform: uppercase;
+}
+
+.security-item span:first-child {
+font-size: 1.25rem;
+}
