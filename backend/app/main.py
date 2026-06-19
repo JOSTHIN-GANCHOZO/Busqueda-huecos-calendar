@@ -2,6 +2,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api import endpoints  # Tus rutas actuales
 from app.database.database import init_db  # ← NUEVA LINEA: Importamos el inicializador de la DB
+import dotenv  # ← AGREGAR ESTA LÍNEA
+
+# ← AGREGAR ESTA LÍNEA: Carga las llaves del .env antes de cualquier otra cosa
+dotenv.load_dotenv()
 
 app = FastAPI(title="Asistente de Calendario IA")
 

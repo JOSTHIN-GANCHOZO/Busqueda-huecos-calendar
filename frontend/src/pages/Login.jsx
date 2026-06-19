@@ -6,7 +6,8 @@ const Login = () => {
 return (
         <div className="login-container"> 
             <div className="login-card"> 
-                <div className="login-content"> <h1 className="login-title">Smart Scheduler IA</h1>
+                <div className="login-content"> 
+                    <h1 className="login-title">Smart Scheduler IA</h1>
                     <p className="login-description">
                         Optimiza tus reuniones cruzando agendas con inteligencia artificial
                     </p>

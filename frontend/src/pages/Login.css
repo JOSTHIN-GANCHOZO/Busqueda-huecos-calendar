@@ -22,13 +22,17 @@ text-align: center;
 
 .login-title {
 font-size: 1.875rem;
+font-family: inter, sans-serif;
 font-weight: 700;
 color: #1e293b;
 margin-bottom: 0.5rem;
 }
 
 .login-description {
+
 color: #64748b;
+font-family: inter, sans-serif;
+margin-top: 1rem;
 margin-bottom: 2.5rem;
 line-height: 1.6;
 }
@@ -49,8 +53,8 @@ text-align: center;
 font-size: 0.625rem;
 text-transform: uppercase;
 letter-spacing: 0.15em;
-color: #94a3b8;
-font-weight: 600;
+color: #4f46e5;
+font-weight: bold;
 margin-bottom: 1rem;
 }
 
@@ -71,6 +75,10 @@ text-transform: uppercase;
 }
 
 .security-item span:first-child {
-font-size: 1.25rem;
+   font-size: 1.5rem;
+}
+.security-item span:last-child {
+    font-family: inter, sans-serif;
+    font-weight: bold;
 }
 }

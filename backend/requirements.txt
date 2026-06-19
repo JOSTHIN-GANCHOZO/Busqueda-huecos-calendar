@@ -7,3 +7,4 @@ google-auth-oauthlib
 pydantic
 email-validator
 sqlalchemy==2.0.51
+python-dotenv

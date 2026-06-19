@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import './botonGoogle.css'
 import axios from "axios";
-
+import GoogleIcon from '../../assets/google.png';
 const API_URL = "http://localhost:8000/api/v1/auth/login";
 
 const BotonGoogle = () => {
@@ -32,8 +32,6 @@ const handleLogin = async () => {
         } finally {
          setLoading(false);
         }
-
-
     };
 
     return ( 
@@ -41,8 +39,16 @@ const handleLogin = async () => {
             type="button"
             onClick={handleLogin}
             disabled={loading}
-            > <span>
-            {loading ? "Conectando..." : "Continuar con Google"} </span> 
+            className="google-button" 
+            >
+            <div className="google-button-content">
+                <span className="google-icon">
+                    <img src={GoogleIcon} alt="Google Icon" />
+                </span>
+                <span className="google-button-text">
+                  {loading ? "Conectando..." : "Continuar con Google"}
+                 </span>
+            </div>
         </button>
     );
 };
