@@ -1,0 +1,189 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+.scheduler-page-container {
+    min-height: 100vh;
+    width: 100%;
+    background-color: #1e2640;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+    box-sizing: border-box;
+    font-family: 'Inter', sans-serif;
+}
+
+.scheduler-card {
+    background-color: #ffffff;
+    width: 100%;
+    max-width: 550px;
+    border-radius: 20px;
+    padding: 40px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+    box-sizing: border-box;
+}
+
+.scheduler-title {
+    color: #1e293b;
+    font-size: 28px;
+    font-weight: 700; /* Bold */
+    text-align: center;
+    margin: 0 0 10px 0;
+}
+
+.scheduler-subtitle {
+    color: #64748b;
+    font-size: 15px;
+    text-align: center;
+    margin: 0 0 25px 0;
+}
+
+.scheduler-user-badge {
+    background-color: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    padding: 12px 16px;
+    border-radius: 12px;
+    font-size: 14px;
+    color: #334155;
+    margin-bottom: 25px;
+    display: flex;
+    justify-content: space-between;
+}
+
+.scheduler-user-badge strong {
+    color: #4f46e5;
+    font-weight: 700; /* Bold */
+}
+
+.scheduler-form {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.scheduler-section-title {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    color: #475569;
+    margin-bottom: 12px;
+}
+
+.scheduler-checkbox-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.scheduler-checkbox-item {
+    display: flex;
+    align-items: center;
+    padding: 14px 16px;
+    background-color: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    cursor: pointer;
+}
+
+.scheduler-checkbox-item input {
+    display: none;
+}
+
+.scheduler-checkbox-item .custom-checkbox {
+    width: 20px;
+    height: 20px;
+    border: 2px solid #cbd5e1;
+    border-radius: 6px;
+    margin-right: 12px;
+}
+
+.scheduler-checkbox-item.checked {
+    background-color: #f5f3ff;
+    border-color: #4f46e5;
+}
+
+.scheduler-checkbox-item.checked .custom-checkbox {
+    border-color: #4f46e5;
+    background-color: #4f46e5;
+}
+
+.scheduler-checkbox-item .calendar-name {
+    color: #334155;
+    font-size: 15px;
+    font-weight: 600; /* Bold */
+}
+
+.scheduler-grid-fields {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+}
+
+.scheduler-field-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.scheduler-label-bold {
+    font-size: 13px;
+    font-weight: 700; /* Bold */
+    color: #334155;
+}
+
+.scheduler-field-group select {
+    padding: 12px;
+    border: 1px solid #e2e8f0;
+    background-color: #f8fafc;
+    color: #000000;
+    font-weight: 600; /* Bold */
+    border-radius: 12px;
+    font-size: 14px;
+    font-family: 'Inter', sans-serif;
+}
+.scheduler-field-group Label{
+    font-weight: 600; /* Bold */
+    font-family: 'Inter', sans-serif;
+    color:#4f46e5;
+}
+.scheduler-submit-btn {
+    width: 100%;
+    background-color: #4f46e5;
+    color: #ffffff;
+    border: none;
+    padding: 16px;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 700; /* Bold */
+    font-family: 'Inter', sans-serif;
+    cursor: pointer;
+    margin-top: 10px;
+}
+
+.scheduler-loading-text {
+    font-weight: 600;
+    color: #4f46e5;
+}
+
+.scheduler-result-title {
+    color: #166534;
+    font-size: 15px;
+    font-weight: 700; /* Bold */
+    margin: 0;
+}
+
+.scheduler-result-card {
+    margin-top: 25px;
+    background-color: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-radius: 14px;
+    padding: 20px;
+}
+
+.result-json {
+    background-color: #1e293b;
+    color: #38bdf8;
+    padding: 15px;
+    border-radius: 8px;
+    font-size: 12px;
+    overflow-x: auto;
+}

@@ -129,3 +129,38 @@ def buscar_huecos(datos: RequestCalendario, db: Session = Depends(get_db)):
             "rango_busqueda_dias": datos.rango_dias
         }
     }
+# ==========================================
+# 4. LISTAR CALENDARIOS REALES DE GOOGLE
+# ==========================================
+@router.get("/lista-calendarios", summary="Obtiene los calendarios reales desde Google")
+def obtener_calendarios(email: str, db: Session = Depends(get_db)):
+    # 1. Buscar al usuario en la base de datos
+    usuario = db.query(UsuarioToken).filter(UsuarioToken.email == email).first()
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado en la base de datos")
+
+    # 2. Llamar a la API de Google usando el Access Token del usuario
+    google_url = "https://www.googleapis.com/calendar/v3/users/me/calendarList"
+    headers = {"Authorization": f"Bearer {usuario.access_token}"}
+    
+    res = requests.get(google_url, headers=headers)
+    
+    # 3. Si el token expiró, por ahora lanzamos un aviso (luego podemos meter el refresh_token)
+    if res.status_code == 401:
+        raise HTTPException(
+            status_code=401, 
+            detail="El token de Google ha expirado. Por favor, vuelva a iniciar sesión."
+        )
+        
+    calendarios_data = res.json()
+    
+    # 4. Limpiar la respuesta para enviarle a React solo lo que necesita (id y nombre)
+    items = calendarios_data.get("items", [])
+    resultado = []
+    for item in items:
+        resultado.append({
+            "id": item.get("id"),
+            "nombre": item.get("summary") # 'summary' es el nombre del calendario en Google
+        })
+        
+    return resultado

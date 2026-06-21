@@ -1,0 +1,49 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+.redirect-container {
+    min-height: 100vh;
+    width: 100%;
+    background-color: #1e2640; /* Tu azul oscuro de fondo */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+    box-sizing: border-box;
+    font-family: 'Inter', sans-serif;
+}
+
+.redirect-card {
+    text-align: center;
+    max-width: 400px;
+}
+
+.redirect-spinner {
+    width: 55px;
+    height: 55px;
+    border: 4px solid rgba(255, 255, 255, 0.1);
+    border-top: 4px solid #4f46e5; /* El azul de tu botón */
+    border-radius: 50%;
+    margin: 0 auto 24px auto;
+    animation: spin-redirect 0.8s linear infinite;
+}
+
+.redirect-title {
+    color: #ffffff;
+    font-size: 20px;
+    font-weight: 700; /* Bold */
+    margin: 0 0 10px 0;
+    letter-spacing: -0.5px;
+}
+
+.redirect-text {
+    color: #94a3b8;
+    font-size: 14px;
+    font-weight: 400;
+    margin: 0;
+    line-height: 1.5;
+}
+
+@keyframes spin-redirect {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
