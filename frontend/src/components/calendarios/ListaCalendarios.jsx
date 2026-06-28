@@ -16,6 +16,7 @@ const SeleccionCalendarios = () => {
     const [calendariosSeleccionados, setCalendariosSeleccionados] = useState([]);
     const [duracion, setDuracion] = useState(30);
     const [rangoDias, setRangoDias] = useState(30);
+    const [tituloReunion, setTituloReunion] = useState("");
     const [loadingLogs, setLoadingLogs] = useState(true);
     const [loadingAlgoritmo, setLoadingAlgoritmo] = useState(false);
     const [resultado, setResultado] = useState(null);
@@ -64,12 +65,17 @@ useEffect(() => {
             email: userEmail,
             calendarios_ids: calendariosSeleccionados,
             duracion: parseInt(duracion),
-            rango_dias: parseInt(rangoDias)
+            rango_dias: parseInt(rangoDias),
+            titulo: tituloReunion.trim() === "" ? "Reunión de Trabajo" : tituloReunion
         };
 
         try {
             const { data } = await axios.post(API_BUSCAR_HUECOS, payload);
             setResultado(data);
+            setCalendariosSeleccionados([]);           // Desmarca todos los checkboxes
+            setDuracion(30);                           // Regresa la duración a 30 minutos
+            setRangoDias(30);                          // Regresa el rango a 30 días
+            setTituloReunion("");    // Restablece el título por defecto
         } catch (error) {
             console.error("Error al buscar huecos:", error);
             alert(error.response?.data?.detail || "Error en el servidor.");
@@ -92,7 +98,6 @@ useEffect(() => {
     }
     else 
     {
-
         return (
             <div className="scheduler-page-container">
                 <div className="scheduler-card">
@@ -154,7 +159,19 @@ useEffect(() => {
                                     </select>
                                 </div>
                             </div>
-
+                            {/* Titulo de reunion */}
+                            <div className="scheduler-seccion-title">
+                                <div className="scheduler-field-group">
+                                    <label htmlFor="titulo">Título de la reunión</label>
+                                    <input 
+                                        type="text" 
+                                        id="titulo"
+                                        value={tituloReunion} 
+                                        onChange={(e) => setTituloReunion(e.target.value)} 
+                                        placeholder="Ej: Mentoría de Proyecto, Sincro de Equipo..."
+                                    />
+                                </div>
+                            </div>
                             {/* BOTÓN CON ESTILO DEL DE GOOGLE */}
                             <button type="submit" className="scheduler-submit-btn" disabled={loadingAlgoritmo}>
                                 {loadingAlgoritmo ? "Procesando Agendas..." : "Optimizar Reunión con IA"}

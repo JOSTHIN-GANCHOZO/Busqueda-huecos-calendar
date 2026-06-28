@@ -24,7 +24,7 @@ class RequestCalendario(BaseModel):
     calendarios_ids: List[str] = Field(..., min_items=1, description="Lista de IDs de calendarios a evaluar")
     duracion: int = Field(..., gt=0, description="Duración del evento en minutos")
     rango_dias: int = Field(30, gt=0, le=90, description="Rango máximo de días de búsqueda")
-
+    titulo: str = Field("Reunión de Trabajo", min_length=3, max_length=100, description="Título o asunto de la reunión")
 class CalendarioResponse(BaseModel):
     id: str
     nombre: str
@@ -170,6 +170,7 @@ def buscar_huecos(datos: RequestCalendario, db: Session = Depends(get_db)) -> Di
         "payload": {
             "targets": datos.calendarios_ids,
             "duration_minutes": datos.duracion,
-            "horizon_days": datos.rango_dias
+            "horizon_days": datos.rango_dias,
+            "title": datos.titulo
         }
     }
