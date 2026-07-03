@@ -1,36 +1,24 @@
 import React, { useState } from "react";
-import './botonGoogle.css'
-import axios from "axios";
+import './BotonGoogle.css';
 import GoogleIcon from '../../assets/google.png';
-const API_URL = "http://localhost:8000/api/v1/auth/login";
+import { authService } from '../../servicios/auth.js'; 
 
 const BotonGoogle = () => {
-const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(false);
 
-const handleLogin = async () => {
-
+    const handleLogin = async () => {
         if (loading) return;
-
         setLoading(true);
 
         try {
-            const { data } = await axios.get(API_URL);
-
-            if (!data?.auth_url) {
-                throw new Error("No se recibió la URL de autenticación.");
-            }
-
-            window.location.assign(data.auth_url);
+            // Llamamos al servicio que ya tienes en tu carpeta
+            const authUrl = await authService.getGoogleAuthUrl();
+            window.location.assign(authUrl);
         } catch (error) {
             console.error("Error al iniciar sesión con Google:", error);
-
-            const mensaje =
-                error.response?.data?.detail ||
-                "No fue posible conectar con Google. Intenta nuevamente.";
-
-            alert(mensaje);
+            alert(error.message); // El servicio ya te da el mensaje limpio aquí
         } finally {
-         setLoading(false);
+            setLoading(false);
         }
     };
 
@@ -40,14 +28,14 @@ const handleLogin = async () => {
             onClick={handleLogin}
             disabled={loading}
             className="google-button" 
-            >
+        >
             <div className="google-button-content">
                 <span className="google-icon">
                     <img src={GoogleIcon} alt="Google Icon" />
                 </span>
                 <span className="google-button-text">
                   {loading ? "Conectando..." : "Continuar con Google"}
-                 </span>
+                </span>
             </div>
         </button>
     );
