@@ -59,10 +59,14 @@ def login() -> Dict[str, str]:
 # 2. CALLBACK OAUTH2: PROCESAMIENTO E INSERCIÓN
 # =========================================================================
 @router.get("/callback", summary="Procesa el código de autorización e intercambia tokens")
-def callback(code: str = None, db: Session = Depends(get_db)):
+def callback(code: str = None, error: str = None, db: Session = Depends(get_db)):
+    # Si el usuario canceló la autenticación en Google
+    if error:
+        return RedirectResponse(url=f"{FRONTEND_URL}/login?status=cancelled")
+    
+    # Si no hay código ni error (caso inesperado)
     if not code:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Código de autorización no provisto.")
-
+        return RedirectResponse(url=f"{FRONTEND_URL}/login?status=error")
     # Intercambio de Code por Tokens
     token_url = "https://oauth2.googleapis.com/token"
     token_data = {
@@ -119,7 +123,7 @@ def callback(code: str = None, db: Session = Depends(get_db)):
 
     except Exception as e:
         db.rollback()
-        print(f"Error en callback: {str(e)}")  # Se registra en la consola del servidor
+        print(f"Error en callback: {str(e)}")
         return RedirectResponse(url=f"{FRONTEND_URL}/login?status=server_error")
 
 
