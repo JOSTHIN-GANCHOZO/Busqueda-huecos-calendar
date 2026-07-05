@@ -5,54 +5,77 @@ from googleapiclient.discovery import build
 from google.auth.transport.requests import Request
 from sqlalchemy.orm import Session
 
-# --- CONFIGURACIÓN DE ENTORNO ---
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
 
-def obtener_servicio_calendar(usuario_db_record, db_session: Session):
-    """
-    Construye un cliente autenticado para la API de Google Calendar.
-    Si el access_token del usuario ha expirado, utiliza el refresh_token 
-    para renovarlo automáticamente y actualiza la base de datos.
-    """
+def obtener_servicio_calendar(usuario, db: Session):
+    """Cliente autenticado de Google Calendar con refresco automático de token."""
     if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
-        raise ValueError("Las credenciales de Google Client ID/Secret no están configuradas en el .env")
+        raise ValueError("Credenciales de Google no configuradas en .env")
 
-    # 1. Normalizar la fecha de expiración para compatibilidad (Google espera UTC naive o consciente)
-    expiry_date = usuario_db_record.token_expiry
-    if expiry_date and expiry_date.tzinfo is not None:
-        expiry_date = expiry_date.astimezone(timezone.utc).replace(tzinfo=None)
+    expiry = usuario.token_expiry
+    if expiry and expiry.tzinfo:
+        expiry = expiry.astimezone(timezone.utc).replace(tzinfo=None)
 
-    # 2. Reconstruir el objeto de credenciales OAuth2
     creds = Credentials(
-        token=usuario_db_record.access_token,
-        refresh_token=usuario_db_record.refresh_token,
+        token=usuario.access_token,
+        refresh_token=usuario.refresh_token,
         token_uri="https://oauth2.googleapis.com/token",
         client_id=GOOGLE_CLIENT_ID,
         client_secret=GOOGLE_CLIENT_SECRET,
-        expiry=expiry_date
+        expiry=expiry
     )
 
-    # 3. Guardián de Expiración: Refresco automático y transparente
-    if creds and creds.expired and creds.refresh_token:
-        print(f"🔄 Token expirado para {usuario_db_record.email}. Solicitando renovación...")
-        try:
-            creds.refresh(Request())
-            
-            # Actualizar el registro en caliente
-            usuario_db_record.access_token = creds.token
-            if creds.expiry:
-                usuario_db_record.token_expiry = creds.expiry.replace(tzinfo=timezone.utc)
-            else:
-                usuario_db_record.token_expiry = datetime.now(timezone.utc) + timedelta(seconds=3600)
-            
-            db_session.commit()
-            print(f"✅ tokens.db sincronizada exitosamente para {usuario_db_record.email}.")
-            
-        except Exception as e:
-            db_session.rollback()
-            print(f"❌ Falló el refresco automático de Google OAuth: {str(e)}")
-            raise e
+    if creds.expired and creds.refresh_token:
+        creds.refresh(Request())
+        usuario.access_token = creds.token
+        usuario.token_expiry = creds.expiry.replace(tzinfo=timezone.utc) if creds.expiry else datetime.now(timezone.utc) + timedelta(seconds=3600)
+        db.commit()
 
-    # 4. Retornar el cliente listo para interactuar con los recursos
     return build("calendar", "v3", credentials=creds)
+
+
+def obtener_eventos_google(usuario, db: Session, calendarios_ids: list, desde: datetime, hasta: datetime):
+    """Devuelve (eventos_en_utc, zona_horaria) de los calendarios indicados con paginación."""
+    service = obtener_servicio_calendar(usuario, db)
+    eventos = []
+    
+    # Detectar zona horaria del usuario
+    zona = "America/Guayaquil"
+    if calendarios_ids:
+        try:
+            zona = service.calendars().get(calendarId=calendarios_ids[0]).execute().get('timeZone', zona)
+        except:
+            pass
+
+    # Formato UTC explícito para Google
+    time_min = desde.strftime("%Y-%m-%dT%H:%M:%SZ")
+    time_max = hasta.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    for cal_id in calendarios_ids:
+        page_token = None
+        while True:
+            result = service.events().list(
+                calendarId=cal_id,
+                timeMin=time_min,
+                timeMax=time_max,
+                singleEvents=True,
+                orderBy='startTime',
+                pageToken=page_token
+            ).execute()
+
+            for item in result.get('items', []):
+                inicio = item.get('start', {}).get('dateTime') or item.get('start', {}).get('date')
+                fin = item.get('end', {}).get('dateTime') or item.get('end', {}).get('date')
+                
+                if inicio and fin:
+                    eventos.append({
+                        "start": datetime.fromisoformat(inicio).astimezone(timezone.utc),
+                        "end": datetime.fromisoformat(fin).astimezone(timezone.utc)
+                    })
+
+            page_token = result.get('nextPageToken')
+            if not page_token:
+                break
+
+    return eventos, zona

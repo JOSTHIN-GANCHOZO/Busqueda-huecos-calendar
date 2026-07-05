@@ -9,6 +9,8 @@ from sqlalchemy.orm import Session
 
 from app.database.database import get_db, UsuarioToken
 from app.core.google_cal import obtener_servicio_calendar
+from app.ia.search import calcular_hueco_greedy
+from app.core.google_cal import obtener_eventos_google
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
@@ -117,7 +119,8 @@ def callback(code: str = None, db: Session = Depends(get_db)):
 
     except Exception as e:
         db.rollback()
-        return RedirectResponse(url=f"{FRONTEND_URL}/login?status=server_error&detail={str(e)}")
+        print(f"Error en callback: {str(e)}")  # Se registra en la consola del servidor
+        return RedirectResponse(url=f"{FRONTEND_URL}/login?status=server_error")
 
 
 # =========================================================================
@@ -151,26 +154,70 @@ def obtener_calendarios(email: EmailStr, db: Session = Depends(get_db)):
             detail=f"Error al conectar con Google API: {str(e)}"
         )
 
-
 # =========================================================================
 # 4. ALGORITMO: ENTRADA PRE-PROCESAMIENTO DE IA
 # =========================================================================
 @router.post("/buscar-huecos", summary="Punto de control inicial para el motor de búsqueda de IA")
 def buscar_huecos(datos: RequestCalendario, db: Session = Depends(get_db)) -> Dict[str, Any]:
+    # 1. Validar el usuario en SQLite
     usuario = db.query(UsuarioToken).filter(UsuarioToken.email == datos.email).first()
     if not usuario:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, 
             detail="Tokens de sesión ausentes. Autentíquese con Google."
         )
+    # 2. DEFINIR EL HORIZONTE DE BÚSQUEDA (Rango de tiempo)
+    ahora = datetime.now()
+    # El inicio de la búsqueda es estricto: la hora exacta de hoy en adelante
+    inicio_busqueda = ahora
+    # Si la hora actual es posterior al cierre de la jornada (ej. más de las 18:00),
+    # o si quieres forzar que empiece mañana temprano si ya es muy tarde:
+    if ahora.hour >= 18:
+        # Empezamos mañana a las 8:00 AM
+        inicio_busqueda = (ahora + timedelta(days=1)).replace(hour=8, minute=0, second=0, microsecond=0)
+    elif ahora.hour < 8:
+        # Si consultas en la madrugada (ej. 6:00 AM), empezamos hoy mismo a las 8:00 AM
+        inicio_busqueda = ahora.replace(hour=8, minute=0, second=0, microsecond=0)
+    # El horizonte máximo de días se calcula a partir de este nuevo inicio seguro
+    fin_busqueda = (inicio_busqueda + timedelta(days=datos.rango_dias)).replace(hour=18, minute=0, second=0, microsecond=0)
     
-    return {
-        "status": "success",
-        "mensaje": f"Configuración y credenciales validadas para {datos.email}.",
-        "payload": {
-            "targets": datos.calendarios_ids,
-            "duration_minutes": datos.duracion,
-            "horizon_days": datos.rango_dias,
-            "title": datos.titulo
+    try:
+        # 3. CONSUMO REAL DE GOOGLE CALENDAR
+        eventos_real_google, zona_str = obtener_eventos_google(
+            usuario=usuario,
+            db=db,
+            calendarios_ids=datos.calendarios_ids,
+            desde=inicio_busqueda,
+            hasta=fin_busqueda
+        )
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Error crítico al conectar con Google Calendar: {str(e)}"
+        )
+
+    # 4. EJECUCIÓN DEL MOTOR DE IA (ALGORITMO GREEDY)
+    resultado_optimo = calcular_hueco_greedy(
+        eventos_ocupados=eventos_real_google,
+        inicio_rango=inicio_busqueda,
+        fin_rango=fin_busqueda,
+        duracion_minutos=datos.duracion,
+        zona_usuario=zona_str
+    )
+
+    # 5. CONTROL DE RESPUESTA INTEGRADA REPETIBLE (CORRECCIÓN DE LÓGICA)
+    if resultado_optimo:
+        return {
+            "status": "success",
+            "algoritmo_aplicado": "Greedy Interval Scheduling",
+            "mensaje": f"Horario óptimo calculado con éxito para {datos.email}.",
+            "titulo_reunion": datos.titulo,
+            "horario_principal_recomendado": resultado_optimo
         }
+    
+    # Solo retorna error si el algoritmo devolvió None
+    return {
+        "status": "error",
+        "mensaje": "No se encontraron huecos libres que cumplan con los requisitos en el rango de días seleccionado."
     }
