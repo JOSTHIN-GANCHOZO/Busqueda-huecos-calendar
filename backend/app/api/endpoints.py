@@ -28,9 +28,16 @@ class RequestCalendario(BaseModel):
     duracion: int = Field(..., gt=0, description="Duración del evento en minutos")
     rango_dias: int = Field(30, gt=0, le=90, description="Rango máximo de días de búsqueda")
     titulo: str = Field("Reunión de Trabajo", min_length=3, max_length=100, description="Título o asunto de la reunión")
+
 class CalendarioResponse(BaseModel):
     id: str
     nombre: str
+
+class EventosCalendarioRequest(BaseModel):
+    email: EmailStr
+    calendarios_ids: List[str] = Field(..., min_items=1, description="IDs de los calendarios a consultar")
+    fecha_inicio: datetime = Field(..., description="Inicio del rango (puede incluir zona horaria o UTC)")
+    fecha_fin: datetime = Field(..., description="Fin del rango (puede incluir zona horaria o UTC)")
 
 
 # =========================================================================
@@ -131,102 +138,307 @@ def callback(code: str = None, error: str = None, db: Session = Depends(get_db))
 # =========================================================================
 # 3. CONSUMO: LISTAR CALENDARIOS DISPONIBLES
 # =========================================================================
-@router.get("/lista-calendarios", response_model=List[CalendarioResponse], summary="Obtiene los calendarios de la cuenta del alumno")
-def obtener_calendarios(email: EmailStr, db: Session = Depends(get_db)):
-    usuario = db.query(UsuarioToken).filter(UsuarioToken.email == email).first()
-    if not usuario:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, 
-            detail="Usuario no encontrado. Por favor, inicie sesión nuevamente."
-        )
+@router.get(
+    "/lista-calendarios",
+    response_model=List[CalendarioResponse],
+    summary="Obtiene todos los calendarios disponibles del usuario"
+)
+def obtener_calendarios(
+    email: EmailStr,
+    db: Session = Depends(get_db)
+):
 
-    try:
-        # Invocar el cliente inteligente de core
-        service = obtener_servicio_calendar(usuario, db)
-        
-        # Consumir el listado mediante la librería oficial de Google
-        calendar_list = service.calendarList().list().execute()
-        items = calendar_list.get("items", [])
-        
-        return [
-            CalendarioResponse(id=item["id"], nombre=item.get("summary", "Calendario sin título"))
-            for item in items
-        ]
+    # ============================
+    # Buscar usuario
+    # ============================
+    usuario = db.query(UsuarioToken).filter(
+        UsuarioToken.email == email
+    ).first()
 
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error al conectar con Google API: {str(e)}"
-        )
-
-# =========================================================================
-# 4. ALGORITMO: ENTRADA PRE-PROCESAMIENTO DE IA
-# =========================================================================
-@router.post("/buscar-huecos", summary="Punto de control inicial para el motor de búsqueda de IA")
-def buscar_huecos(datos: RequestCalendario, db: Session = Depends(get_db)) -> Dict[str, Any]:
-    # 1. Validar el usuario en SQLite
-    usuario = db.query(UsuarioToken).filter(UsuarioToken.email == datos.email).first()
     if not usuario:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Tokens de sesión ausentes. Autentíquese con Google."
+            detail="Usuario no autenticado. Inicie sesión nuevamente."
         )
 
-    # 2. DEFINIR UN RANGO INICIAL AMPLIO (luego ajustaremos el inicio exacto)
-    #    Usamos UTC ahora como referencia, pero luego refinaremos con la zona del usuario.
-    ahora_utc = datetime.now(timezone.utc)
-    # Rango preliminar amplio: desde este momento hasta N días después
-    fin_busqueda_preliminar = ahora_utc + timedelta(days=datos.rango_dias)
-
     try:
-        # 3. CONSUMO REAL DE GOOGLE CALENDAR (nos devuelve también la zona horaria)
-        eventos_real_google, zona_str = obtener_eventos_google(
+
+        service = obtener_servicio_calendar(usuario, db)
+
+        respuesta = service.calendarList().list().execute()
+
+        calendarios = respuesta.get("items", [])
+
+        resultado = []
+
+        for calendario in calendarios:
+
+            resultado.append(
+                CalendarioResponse(
+                    id=calendario["id"],
+                    nombre=calendario.get(
+                        "summary",
+                        "Calendario sin nombre"
+                    )
+                )
+            )
+
+        print("=" * 60)
+        print("Usuario:", email)
+        print("Calendarios encontrados:", len(resultado))
+
+        for cal in resultado:
+            print(cal.id, "-", cal.nombre)
+
+        print("=" * 60)
+
+        return resultado
+
+    except Exception as e:
+
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"No fue posible obtener los calendarios: {str(e)}"
+        )
+    
+# =========================================================================
+# 4. OBTENER EVENTOS PARA LA VISTA DE CALENDARIO
+# =========================================================================
+@router.post(
+    "/eventos-calendario",
+    summary="Obtiene los eventos ocupados de los calendarios seleccionados"
+)
+def obtener_eventos_calendario(
+    datos: EventosCalendarioRequest,
+    db: Session = Depends(get_db)
+) -> Dict[str, Any]:
+
+    # ===========================
+    # Validar usuario
+    # ===========================
+    usuario = db.query(UsuarioToken).filter(
+        UsuarioToken.email == datos.email
+    ).first()
+
+    if not usuario:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Usuario no autenticado. Inicie sesión nuevamente."
+        )
+
+    # ===========================
+    # Normalizar fechas a UTC
+    # ===========================
+    fecha_inicio = datos.fecha_inicio
+    fecha_fin = datos.fecha_fin
+
+    if fecha_inicio.tzinfo is None:
+        fecha_inicio = fecha_inicio.replace(tzinfo=timezone.utc)
+    else:
+        fecha_inicio = fecha_inicio.astimezone(timezone.utc)
+
+    if fecha_fin.tzinfo is None:
+        fecha_fin = fecha_fin.replace(tzinfo=timezone.utc)
+    else:
+        fecha_fin = fecha_fin.astimezone(timezone.utc)
+
+    # ===========================
+    # Consultar Google Calendar
+    # ===========================
+    try:
+
+        eventos, zona_str = obtener_eventos_google(
+            usuario=usuario,
+            db=db,
+            calendarios_ids=datos.calendarios_ids,
+            desde=fecha_inicio,
+            hasta=fecha_fin
+        )
+
+    except Exception as e:
+
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Error al consultar Google Calendar: {str(e)}"
+        )
+
+    # ===========================
+    # Zona horaria del usuario
+    # ===========================
+    try:
+        tz_usuario = pytz.timezone(zona_str)
+    except Exception:
+        tz_usuario = pytz.UTC
+
+    eventos_serializados = []
+
+    # ===========================
+    # Convertir eventos
+    # ===========================
+    for evento in eventos:
+
+        try:
+
+            inicio = evento["start"]
+            fin = evento["end"]
+
+            if inicio.tzinfo is None:
+                inicio = inicio.replace(tzinfo=timezone.utc)
+
+            if fin.tzinfo is None:
+                fin = fin.replace(tzinfo=timezone.utc)
+
+            eventos_serializados.append({
+                "id": evento.get("id"),
+                "title": evento.get("title", "Sin título"),
+                "description": evento.get("description", ""),
+                "calendar_id": evento.get("calendar_id"),
+                "color": evento.get("color"),
+                "start": inicio.astimezone(tz_usuario).isoformat(),
+                "end": fin.astimezone(tz_usuario).isoformat()
+            })
+
+        except Exception as e:
+            print("Error procesando evento:", e)
+
+    # ===========================
+    # Logs de depuración
+    # ===========================
+    print("=" * 60)
+    print("Usuario:", datos.email)
+    print("Calendarios:", datos.calendarios_ids)
+    print("Zona:", zona_str)
+    print("Eventos enviados:", len(eventos_serializados))
+    print("=" * 60)
+
+    return {
+        "status": "success",
+        "zona_horaria": zona_str,
+        "total": len(eventos_serializados),
+        "eventos": eventos_serializados
+    }
+# =========================================================================
+# 4. ALGORITMO: ENTRADA PRE-PROCESAMIENTO DE IA
+# =========================================================================
+@router.post(
+    "/buscar-huecos",
+    summary="Busca los mejores huecos disponibles utilizando el algoritmo Greedy"
+)
+def buscar_huecos(
+    datos: RequestCalendario,
+    db: Session = Depends(get_db)
+) -> Dict[str, Any]:
+
+    # ==========================================
+    # Validar usuario
+    # ==========================================
+    usuario = db.query(UsuarioToken).filter(
+        UsuarioToken.email == datos.email
+    ).first()
+
+    if not usuario:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Usuario no autenticado. Inicie sesión nuevamente."
+        )
+
+    # ==========================================
+    # Definir rango preliminar
+    # ==========================================
+    ahora_utc = datetime.now(timezone.utc)
+
+    fin_preliminar = ahora_utc + timedelta(days=datos.rango_dias)
+
+    # ==========================================
+    # Obtener eventos desde Google
+    # ==========================================
+    try:
+
+        eventos_google, zona_str = obtener_eventos_google(
             usuario=usuario,
             db=db,
             calendarios_ids=datos.calendarios_ids,
             desde=ahora_utc,
-            hasta=fin_busqueda_preliminar
+            hasta=fin_preliminar
         )
+
     except Exception as e:
+
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Error crítico al conectar con Google Calendar: {str(e)}"
+            detail=f"No fue posible consultar Google Calendar: {str(e)}"
         )
-    
-    # 4. AJUSTAR EL INICIO DE BÚSQUEDA USANDO LA ZONA HORARIA DEL USUARIO
-    tz_usuario = pytz.timezone(zona_str)
+
+    # ==========================================
+    # Calcular inicio de búsqueda
+    # ==========================================
+    try:
+        tz_usuario = pytz.timezone(zona_str)
+    except Exception:
+        tz_usuario = pytz.UTC
+
     ahora_local = datetime.now(tz_usuario)
 
     if ahora_local.hour >= 18:
-        inicio_local = (ahora_local + timedelta(days=1)).replace(hour=8, minute=0, second=0, microsecond=0)
+
+        inicio_local = (
+            ahora_local + timedelta(days=1)
+        ).replace(
+            hour=8,
+            minute=0,
+            second=0,
+            microsecond=0
+        )
+
     elif ahora_local.hour < 8:
-        inicio_local = ahora_local.replace(hour=8, minute=0, second=0, microsecond=0)
+
+        inicio_local = ahora_local.replace(
+            hour=8,
+            minute=0,
+            second=0,
+            microsecond=0
+        )
+
     else:
+
         inicio_local = ahora_local
 
     inicio_busqueda = inicio_local.astimezone(timezone.utc)
-    fin_busqueda = inicio_busqueda + timedelta(days=datos.rango_dias)
 
-    # 5. EJECUCIÓN DEL MOTOR DE IA (ALGORITMO GREEDY)
-    resultado_optimo = calcular_hueco_greedy(
-        eventos_ocupados=eventos_real_google,
+    fin_busqueda = inicio_busqueda + timedelta(
+        days=datos.rango_dias
+    )
+
+    # ==========================================
+    # Ejecutar algoritmo Greedy
+    # ==========================================
+    resultado = calcular_hueco_greedy(
+        eventos_ocupados=eventos_google,
         inicio_rango=inicio_busqueda,
         fin_rango=fin_busqueda,
         duracion_minutos=datos.duracion,
         zona_usuario=zona_str
     )
 
-    # 6. RESPUESTA
-    if resultado_optimo:
+    if not resultado:
+
         return {
             "status": "success",
-            "algoritmo_aplicado": "Greedy Interval Scheduling",
-            "mensaje": f"Horario óptimo calculado con éxito para {datos.email}.",
+            "mensaje": "No se encontraron huecos disponibles.",
             "titulo_reunion": datos.titulo,
-            "horario_principal_recomendado": resultado_optimo
+            "huecos_recomendados": []
         }
 
+    print("=" * 60)
+    print("Huecos encontrados:", len(resultado))
+    print(resultado)
+    print("=" * 60)
+
     return {
-        "status": "error",
-        "mensaje": "No se encontraron huecos libres que cumplan con los requisitos en el rango de días seleccionado."
+        "status": "success",
+        "mensaje": f"Se encontraron {len(resultado)} horarios disponibles.",
+        "algoritmo_aplicado": "Greedy Interval Scheduling",
+        "titulo_reunion": datos.titulo,
+        "huecos_recomendados": resultado,
+        "total": len(resultado)
     }

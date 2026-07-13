@@ -1,5 +1,6 @@
 import os
 from datetime import datetime, timezone, timedelta
+
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from google.auth.transport.requests import Request
@@ -8,14 +9,23 @@ from sqlalchemy.orm import Session
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
 
+
 def obtener_servicio_calendar(usuario, db: Session):
-    """Cliente autenticado de Google Calendar con refresco automático de token."""
+    """
+    Devuelve un cliente autenticado de Google Calendar.
+    Si el access token expiró lo refresca automáticamente.
+    """
+
     if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
-        raise ValueError("Credenciales de Google no configuradas en .env")
+        raise ValueError(
+            "No se encontraron GOOGLE_CLIENT_ID o GOOGLE_CLIENT_SECRET en el archivo .env"
+        )
 
     expiry = usuario.token_expiry
-    if expiry and expiry.tzinfo:
-        expiry = expiry.astimezone(timezone.utc).replace(tzinfo=None)
+
+    if expiry:
+        if expiry.tzinfo:
+            expiry = expiry.astimezone(timezone.utc).replace(tzinfo=None)
 
     creds = Credentials(
         token=usuario.access_token,
@@ -23,59 +33,173 @@ def obtener_servicio_calendar(usuario, db: Session):
         token_uri="https://oauth2.googleapis.com/token",
         client_id=GOOGLE_CLIENT_ID,
         client_secret=GOOGLE_CLIENT_SECRET,
-        expiry=expiry
+        expiry=expiry,
     )
 
     if creds.expired and creds.refresh_token:
+
         creds.refresh(Request())
+
         usuario.access_token = creds.token
-        usuario.token_expiry = creds.expiry.replace(tzinfo=timezone.utc) if creds.expiry else datetime.now(timezone.utc) + timedelta(seconds=3600)
+
+        usuario.token_expiry = (
+            creds.expiry.replace(tzinfo=timezone.utc)
+            if creds.expiry
+            else datetime.now(timezone.utc) + timedelta(hours=1)
+        )
+
         db.commit()
 
-    return build("calendar", "v3", credentials=creds)
+    return build(
+        "calendar",
+        "v3",
+        credentials=creds,
+        cache_discovery=False
+    )
 
 
-def obtener_eventos_google(usuario, db: Session, calendarios_ids: list, desde: datetime, hasta: datetime):
-    """Devuelve (eventos_en_utc, zona_horaria) de los calendarios indicados con paginación."""
+def obtener_eventos_google(
+    usuario,
+    db: Session,
+    calendarios_ids: list,
+    desde: datetime,
+    hasta: datetime
+):
+    """
+    Obtiene todos los eventos de los calendarios seleccionados.
+
+    Retorna:
+        eventos -> list[dict]
+        zona_horaria -> str
+    """
+
     service = obtener_servicio_calendar(usuario, db)
+
     eventos = []
-    
-    # Detectar zona horaria del usuario
-    zona = "America/Guayaquil"
+
+    zona_horaria = "America/Guayaquil"
+
     if calendarios_ids:
         try:
-            zona = service.calendars().get(calendarId=calendarios_ids[0]).execute().get('timeZone', zona)
-        except:
+            calendario = (
+                service.calendars()
+                .get(calendarId=calendarios_ids[0])
+                .execute()
+            )
+
+            zona_horaria = calendario.get(
+                "timeZone",
+                "America/Guayaquil"
+            )
+
+        except Exception:
             pass
 
-    # Formato UTC explícito para Google
-    time_min = desde.strftime("%Y-%m-%dT%H:%M:%SZ")
-    time_max = hasta.strftime("%Y-%m-%dT%H:%M:%SZ")
+    time_min = desde.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+    time_max = hasta.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
-    for cal_id in calendarios_ids:
+    for calendar_id in calendarios_ids:
+
         page_token = None
+
         while True:
-            result = service.events().list(
-                calendarId=cal_id,
-                timeMin=time_min,
-                timeMax=time_max,
-                singleEvents=True,
-                orderBy='startTime',
-                pageToken=page_token
-            ).execute()
 
-            for item in result.get('items', []):
-                inicio = item.get('start', {}).get('dateTime') or item.get('start', {}).get('date')
-                fin = item.get('end', {}).get('dateTime') or item.get('end', {}).get('date')
-                
-                if inicio and fin:
-                    eventos.append({
-                        "start": datetime.fromisoformat(inicio).astimezone(timezone.utc),
-                        "end": datetime.fromisoformat(fin).astimezone(timezone.utc)
-                    })
+            resultado = (
+                service.events()
+                .list(
+                    calendarId=calendar_id,
+                    timeMin=time_min,
+                    timeMax=time_max,
+                    singleEvents=True,
+                    orderBy="startTime",
+                    showDeleted=False,
+                    maxResults=2500,
+                    pageToken=page_token,
+                )
+                .execute()
+            )
 
-            page_token = result.get('nextPageToken')
+            for item in resultado.get("items", []):
+
+                inicio = (
+                    item.get("start", {}).get("dateTime")
+                    or item.get("start", {}).get("date")
+                )
+
+                fin = (
+                    item.get("end", {}).get("dateTime")
+                    or item.get("end", {}).get("date")
+                )
+
+                if not inicio or not fin:
+                    continue
+
+                # Evento de día completo
+                if "T" not in inicio:
+
+                    inicio_dt = datetime.fromisoformat(
+                        inicio
+                    ).replace(tzinfo=timezone.utc)
+
+                else:
+
+                    inicio_dt = datetime.fromisoformat(
+                        inicio.replace("Z", "+00:00")
+                    ).astimezone(timezone.utc)
+
+                if "T" not in fin:
+
+                    fin_dt = datetime.fromisoformat(
+                        fin
+                    ).replace(tzinfo=timezone.utc)
+
+                else:
+
+                    fin_dt = datetime.fromisoformat(
+                        fin.replace("Z", "+00:00")
+                    ).astimezone(timezone.utc)
+
+                eventos.append(
+                    {
+                        "id": item.get("id"),
+
+                        "title": item.get(
+                            "summary",
+                            "Sin título"
+                        ),
+
+                        "description": item.get(
+                            "description",
+                            ""
+                        ),
+
+                        "calendar_id": calendar_id,
+
+                        "start": inicio_dt,
+
+                        "end": fin_dt,
+
+                        "color": item.get("colorId")
+                    }
+                )
+
+            page_token = resultado.get("nextPageToken")
+
             if not page_token:
                 break
 
-    return eventos, zona
+    print("=" * 60)
+    print("Calendarios:", calendarios_ids)
+    print("Zona horaria:", zona_horaria)
+    print("Eventos encontrados:", len(eventos))
+
+    for evento in eventos:
+        print(
+            evento["title"],
+            evento["start"],
+            evento["end"]
+        )
+
+    print("=" * 60)
+
+    return eventos, zona_horaria
